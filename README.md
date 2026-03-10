@@ -1,44 +1,102 @@
-# VDR Intelligence
+<div align="center">
 
-M&A Due Diligence Orchestrator powered by Amazon Nova 2 with Extended Thinking.
+![Banner](assets/banner.jpg)
 
-Built for the **Amazon Nova Hackathon 2026**.
+# DealLens | VDR Intelligence
+
+**Automated M&A Due Diligence · Powered by Amazon Nova 2 with Extended Thinking**
+
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Amazon Bedrock](https://img.shields.io/badge/Amazon_Bedrock-Nova_2-FF9900?style=flat-square&logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.1-1C3C3C?style=flat-square)](https://langchain-ai.github.io/langgraph/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-6c63ff?style=flat-square)](LICENSE)
+
+</div>
 
 ---
 
 ## Overview
 
-VDR Intelligence is a full-stack AI application that automates M&A due diligence by running a 4-agent LangGraph pipeline against Virtual Data Room (VDR) documents. It produces structured financial, legal, and compliance analysis with a weighted deal score and executive recommendation.
+M&A due diligence is slow, expensive, and bottlenecked by human bandwidth. DealLens eliminates that bottleneck.
 
-**Stack:** FastAPI · LangGraph · Amazon Bedrock (Nova 2) · Dash · ChromaDB · Pydantic v2
+Drop in your Virtual Data Room documents — financials, contracts, compliance filings — and a 4-agent AI pipeline powered by **Amazon Nova 2 with Extended Thinking** tears through them in minutes. You get a structured breakdown across financial health, legal red flags, and compliance risk, collapsed into a single weighted deal score with a go/no-go recommendation and full risk matrix.
+
+Built end-to-end for the **Amazon Nova AI Hackathon 2026**.
 
 ---
 
-## Architecture
+## Demo
+
+![App Screenshot](assets/screenshot.png)
+
+---
+
+## How It Works
+
+```
+VDR Documents  (PDF / DOCX / XLSX)
+      │
+      ├──▶  Node 1 · Financial Analysis       [Nova 2 + Extended Thinking]
+      ├──▶  Node 2 · Contract Red Flags       [Nova 2 + Extended Thinking]
+      ├──▶  Node 3 · Compliance Issues        [Nova 2 + Extended Thinking]
+      │
+      └──▶  Node 4 · Synthesis & Scoring      [Nova 2 + Extended Thinking]
+                  │
+                  └──▶  Deal Score · Risk Matrix · Recommendation · NOVA Chat
+```
+
+**Scoring weights:** Financial × 0.40 · Legal × 0.35 · Compliance × 0.25
+
+| Score | Recommendation |
+|-------|----------------|
+| ≥ 70 | Proceed |
+| 45 – 69 | Proceed with Conditions |
+| < 45 | Do Not Proceed |
+
+Results are cached via **SHA-256 → ChromaDB**. Re-running the same document set returns instantly.
+
+---
+
+## Stack
+
+| Layer | Technology |
+|-------|-----------|
+| AI Models | Amazon Nova 2 (Extended Thinking) via Amazon Bedrock |
+| Orchestration | LangGraph |
+| Backend | FastAPI + Pydantic v2 |
+| Frontend | Dash + Plotly + Bootstrap |
+| Cache | ChromaDB |
+| Document Parsing | PyMuPDF · python-docx · openpyxl |
+| Config | pydantic-settings |
+
+---
+
+## Project Structure
 
 ```
 vdr_intelligence/
-├── api/                    # FastAPI backend (port 8000)
+├── api/                        # FastAPI backend  (port 8000)
 │   ├── main.py
 │   ├── dependencies.py
 │   └── routes/
-│       ├── upload.py       # POST /api/v1/upload
-│       ├── diligence.py    # POST /api/v1/diligence/run
-│       └── chat.py         # POST /api/v1/diligence/{doc_id}/chat
-├── pipeline/               # LangGraph 4-node pipeline
+│       ├── upload.py           # POST /api/v1/upload
+│       ├── diligence.py        # POST /api/v1/diligence/run
+│       └── chat.py             # POST /api/v1/diligence/{doc_id}/chat
+├── pipeline/                   # LangGraph 4-node pipeline
 │   ├── graph.py
-│   ├── nova.py             # Bedrock invoke + json-repair
-│   ├── cache.py            # ChromaDB result cache
+│   ├── nova.py                 # Bedrock invoke + json-repair
+│   ├── cache.py                # ChromaDB result cache
 │   └── nodes/
 │       ├── financial.py
 │       ├── contract.py
 │       ├── compliance.py
 │       └── synthesis.py
 ├── ingestion/
-│   └── extractor.py        # PDF / DOCX / XLSX text extraction
+│   └── extractor.py            # PDF / DOCX / XLSX text extraction
 ├── models/
-│   └── schemas.py          # Pydantic v2 models
-├── frontend/               # Dash frontend (port 8050)
+│   └── schemas.py              # Pydantic v2 models
+├── frontend/                   # Dash frontend  (port 8050)
 │   ├── app.py
 │   ├── api_client.py
 │   ├── theme.py
@@ -48,57 +106,30 @@ vdr_intelligence/
 │       ├── pipeline.py
 │       ├── chat.py
 │       └── toggle.py
-└── config.py               # pydantic-settings, reads .env
+└── config.py                   # pydantic-settings, reads .env
 ```
-
-### Pipeline
-
-```
-Document Text
-     │
-     ├──> Node 1: Financial Analysis      (Nova 2 + Extended Thinking)
-     ├──> Node 2: Contract Red Flags      (Nova 2 + Extended Thinking)
-     ├──> Node 3: Compliance Issues       (Nova 2 + Extended Thinking)
-     │
-     └──> Node 4: Synthesis & Scoring    (Nova 2 + Extended Thinking)
-               │
-               └──> Deal Score (0-100) · Recommendation · Risk Matrix
-```
-
-Weights: Financial × 0.4 + Legal × 0.35 + Compliance × 0.25
-
-Cache: SHA-256 of document text → ChromaDB. Repeat runs return instantly.
-
----
-
-## Requirements
-
-- Python 3.11
-- AWS account with Amazon Bedrock access
-- Nova 2 model enabled in your AWS region (`us-east-1` recommended)
 
 ---
 
 ## Setup
 
-**1. Clone and create virtualenv**
+**Requirements:** Python 3.11 · AWS account · Amazon Bedrock access · Nova 2 enabled in `us-east-1`
+
+**1. Clone**
 
 ```powershell
-git clone https://github.com/your-org/vdr-intelligence.git
-cd vdr_intelligence
+git clone https://github.com/divergent99/VDR-Intelligence.git
+cd VDR-Intelligence
 py -3.11 -m venv .venv
 .venv\Scripts\Activate
 pip install -r requirements.txt
-pip install json-repair
 ```
 
-**2. Configure environment**
+**2. Configure**
 
 ```powershell
 cp .env.example .env
 ```
-
-Edit `.env`:
 
 ```env
 AWS_ACCESS_KEY_ID=your_key
@@ -109,26 +140,15 @@ NOVA_MODEL_ID=us.amazon.nova-2-lite-v1:0
 
 **3. Run**
 
-Terminal 1 — FastAPI backend:
 ```powershell
+# Terminal 1 — backend
 uvicorn api.main:app --reload --port 8000
-```
 
-Terminal 2 — Dash frontend:
-```powershell
+# Terminal 2 — frontend
 python -m frontend.app
 ```
 
-Open: http://localhost:8050
-
----
-
-## Usage
-
-1. Drop PDF / DOCX / XLSX files into the upload zone, or paste a local folder path
-2. Click **Run Pipeline** — Nova 2 runs all 4 agents with Extended Thinking
-3. Review the deal score, risk heatmap, area breakdowns, and red flags
-4. Use the **Ask About This Deal** chat to interrogate the report with NOVA
+Open **http://localhost:8050** · API docs at **http://localhost:8000/docs**
 
 ---
 
@@ -136,19 +156,15 @@ Open: http://localhost:8050
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/v1/upload` | Upload files, returns extracted text + doc_id |
-| POST | `/api/v1/diligence/run` | Run full pipeline, returns DiligenceResult |
-| GET | `/api/v1/diligence/{doc_id}` | Fetch cached result |
-| GET | `/api/v1/diligence/{doc_id}/dashboard` | Flat chart-ready payload |
-| POST | `/api/v1/diligence/{doc_id}/chat` | Chat with NOVA about the deal |
-
-Interactive docs: http://localhost:8000/docs
+| `POST` | `/api/v1/upload` | Upload files, returns extracted text + doc_id |
+| `POST` | `/api/v1/diligence/run` | Run full pipeline, returns DiligenceResult |
+| `GET` | `/api/v1/diligence/{doc_id}` | Fetch cached result |
+| `GET` | `/api/v1/diligence/{doc_id}/dashboard` | Flat chart-ready payload |
+| `POST` | `/api/v1/diligence/{doc_id}/chat` | Chat with NOVA about the deal |
 
 ---
 
 ## Configuration
-
-All settings are in `.env` / `config.py`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -166,9 +182,8 @@ All settings are in `.env` / `config.py`:
 
 ---
 
-## Notes
+<div align="center">
 
-- Pipeline runtime: ~2-4 minutes per document set (Extended Thinking enabled)
-- Cache hit returns in <1 second
-- Supported document formats: PDF, DOCX, XLSX
-- `json-repair` is required separately: `pip install json-repair`
+Built by [Abhineet Sharma](https://github.com/divergent99) · Amazon Nova Hackathon 2026
+
+</div>
