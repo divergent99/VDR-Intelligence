@@ -184,6 +184,13 @@ Open **http://localhost:8050** · API docs at **http://localhost:8000/docs**
 
 <div align="center">
 
-Built by [Abhineet Sharma](https://github.com/divergent99) · Amazon Nova Hackathon 2026
+## Team
+
+| GitHub |
+|--------|
+| [divergent99](https://github.com/divergent99) |
+| [YanaaGupta](https://github.com/YanaaGupta) |
+| [Jagrit787](https://github.com/Jagrit787) |
+| [Mango-IM25](https://github.com/Mango-IM25) |
 
 </div>
