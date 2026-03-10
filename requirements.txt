@@ -1,0 +1,36 @@
+# requirements.txt
+
+# API
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9       # required for FastAPI file uploads
+
+# Pydantic
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+
+# AWS
+boto3>=1.34.0
+
+# LangGraph pipeline
+langgraph>=0.1.0
+
+# Document ingestion
+PyMuPDF>=1.24.0               # fitz — PDF parsing
+python-docx>=1.1.0            # DOCX parsing
+openpyxl>=3.1.0               # XLSX parsing
+
+# JSON repair (required for Nova output parsing)
+json-repair>=0.3.0
+
+# Cache
+chromadb>=0.5.0
+
+# Dash frontend
+dash>=2.17.0
+dash-bootstrap-components>=1.6.0
+dash-daq>=0.5.0
+plotly>=5.22.0
+
+# Utilities
+requests>=2.32.0
