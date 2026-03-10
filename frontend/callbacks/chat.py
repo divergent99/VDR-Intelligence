@@ -29,11 +29,12 @@ QUICK_QUESTIONS = [
 
 def _bubble_user(msg: str) -> html.Div:
     return html.Div([
-        html.Div("YOU", style={"fontFamily": MONO, "fontSize": "9px",
+        html.Div("YOU", className="chat-label", style={"fontFamily": MONO, "fontSize": "9px",
             "color": C["accent"], "letterSpacing": "0.15em", "marginBottom": "3px"}),
-        html.Div(msg, style={"fontFamily": MONO, "fontSize": "11px",
+        html.Div(msg, className="chat-text", style={"fontFamily": MONO, "fontSize": "11px",
             "color": C["text"], "lineHeight": "1.5"}),
-    ], style={"background": C["accent"] + "12", "border": f"1px solid {C['accent']}33",
+    ], className="chat-bubble-user",
+    style={"background": C["accent"] + "12", "border": f"1px solid {C['accent']}33",
               "borderRadius": "10px", "padding": "9px 12px",
               "alignSelf": "flex-end", "maxWidth": "94%"})
 
@@ -45,7 +46,8 @@ def _bubble_nova(reply: str) -> html.Div:
         dcc.Markdown(reply, className="nova-md",
             style={"fontSize": "11px"},
             dangerously_allow_html=False),
-    ], style={"background": C["surf2"], "border": f"1px solid {C['border']}",
+    ], className="chat-bubble-nova",
+    style={"background": C["surf2"], "border": f"1px solid {C['border']}",
               "borderRadius": "10px", "padding": "10px 13px",
               "alignSelf": "flex-start", "maxWidth": "96%"})
 
@@ -59,7 +61,7 @@ def _typing_indicator() -> html.Div:
             html.Span(className="typing-dot"),
             html.Span(className="typing-dot"),
         ], style={"display": "flex", "alignItems": "center", "height": "20px"}),
-    ], id="typing-indicator",
+    ], id="typing-indicator", className="chat-bubble-nova",
     style={"background": C["surf2"], "border": f"1px solid {C['border']}",
            "borderRadius": "10px", "padding": "10px 13px",
            "alignSelf": "flex-start", "maxWidth": "96%"})

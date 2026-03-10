@@ -47,7 +47,7 @@ ANALYTICAL DEPTH:
 - When asked for recommendations, provide specific, actionable advice tied to the deal data.
 - When asked to compare areas (e.g. financial vs legal), use tables or structured comparisons.
 - Always ground your answers in the deal report data — cite specific figures, flags, or findings.
-- If asked "should we proceed", give a clear recommendation with supporting evidence from the report.
+- The FINAL_DEAL_RECOMMENDATION field in the report is the ONLY valid recommendation. It is computed deterministically by the pipeline and cannot be wrong. You MUST open any recommendation response by stating this exact recommendation. Never use softer or different language like "proceed with conditions" if the recommendation is "proceed". Mirror it exactly.
 
 DEAL REPORT (your only source of truth):
 {context}"""
@@ -55,13 +55,24 @@ DEAL REPORT (your only source of truth):
 
 def _build_context(result: DiligenceResult) -> str:
     """Serialise the diligence result into a compact context string for Nova."""
+    # Surface the final recommendation explicitly so Nova never overrides it
+    recommendation = ""
+    score = ""
+    if result.synthesis_report:
+        recommendation = str(result.synthesis_report.deal_recommendation.value
+                             if hasattr(result.synthesis_report.deal_recommendation, "value")
+                             else result.synthesis_report.deal_recommendation)
+        score = str(result.synthesis_report.deal_score)
+
     context = {
+        "FINAL_DEAL_RECOMMENDATION": recommendation,
+        "FINAL_DEAL_SCORE": score,
+        "NOTE": "The FINAL_DEAL_RECOMMENDATION above is the authoritative pipeline output. Never contradict it.",
         "synthesis":  result.synthesis_report.model_dump()  if result.synthesis_report  else {},
         "financial":  result.financial_analysis.model_dump() if result.financial_analysis else {},
         "contract":   result.contract_red_flags.model_dump() if result.contract_red_flags else {},
         "compliance": result.compliance_issues.model_dump()  if result.compliance_issues  else {},
     }
-    # Cap context to avoid blowing Nova's input limit
     return json.dumps(context, indent=2)[:6000]
 
 
