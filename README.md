@@ -2,7 +2,7 @@
 
 ![Banner](assets/AWS%20Hackathon.jpg)
 
-# DealLens | VDR Intelligence
+# NovaDD | VDR Intelligence
 
 **Automated M&A Due Diligence · Powered by Amazon Nova 2 with Extended Thinking**
 
@@ -17,7 +17,7 @@
 ---
 
 ## Overview
-M&A due diligence is slow, expensive, and bottlenecked by human bandwidth. DealLens eliminates that bottleneck.
+M&A due diligence is slow, expensive, and bottlenecked by human bandwidth. NovaDD eliminates that bottleneck.
 
 Drop in your Virtual Data Room documents — financials, contracts, compliance filings — and a 4-agent AI pipeline powered by **Amazon Nova 2 with Extended Thinking** tears through them in minutes. You get a structured breakdown across financial health, legal red flags, and compliance risk, collapsed into a single weighted deal score with a go/no-go recommendation and full risk matrix.
 

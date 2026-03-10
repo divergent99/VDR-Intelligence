@@ -348,9 +348,9 @@ def build_layout(theme: str = "dark"):
         # HEADER
         html.Div([html.Div([
             html.Div([
-                html.Span("DEAL", style={"fontFamily": BEBAS, "fontSize": "24px",
+                html.Span("NOVA", style={"fontFamily": BEBAS, "fontSize": "24px",
                     "color": C["accent"], "letterSpacing": "0.06em"}),
-                html.Span("LENS", style={"fontFamily": BEBAS, "fontSize": "24px",
+                html.Span("DD", style={"fontFamily": BEBAS, "fontSize": "24px",
                     "color": C["cyan"], "letterSpacing": "0.06em"}),
                 html.Div("M&A DUE DILIGENCE ORCHESTRATOR · AMAZON NOVA 2",
                     style={"fontFamily": MONO, "fontSize": "8px",
