@@ -1,6 +1,6 @@
 <div align="center">
 
-![Banner](assets/banner.jpg)
+![Banner](assets/AWS Hackathon.jpg)
 
 # DealLens | VDR Intelligence
 
