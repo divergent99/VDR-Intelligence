@@ -25,7 +25,9 @@ from models.schemas import (
 )
 from pipeline.graph import run_diligence
 from pipeline.cache import cache_get
-from api.dependencies import get_cached_result
+from sqlmodel import Session, select
+from models.db import User, Project
+from api.dependencies import get_cached_result, get_current_user, verify_project_access, get_session
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/diligence", tags=["diligence"])
@@ -36,20 +38,40 @@ router = APIRouter(prefix="/diligence", tags=["diligence"])
 # ─────────────────────────────────────────────
 
 @router.post("/run", response_model=DiligenceResult)
-def run(request: RunDiligenceRequest) -> DiligenceResult:
+def run(
+    request: RunDiligenceRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+) -> DiligenceResult:
     """
     Run the full 4-node due diligence pipeline synchronously.
     Pass the extracted_text returned by POST /upload directly here.
     Cache hit = instant return, no Nova calls made.
     """
     logger.info(
-        "POST /diligence/run — document='%s' (%d chars)",
-        request.document_name, len(request.document_text),
+        "POST /diligence/run — user='%s' document='%s' (%d chars)",
+        current_user.email, request.document_name, len(request.document_text),
     )
     import hashlib
     doc_id = hashlib.sha256(request.document_text.encode()).hexdigest()
     result = run_diligence(request.document_text, request.document_name)
     result.doc_id = doc_id
+
+    # Ensure project is in DB — pipeline runner is always the definitive owner
+    project = session.exec(select(Project).where(Project.doc_id == doc_id)).first()
+    if not project:
+        project = Project(
+            doc_id=doc_id, 
+            name=request.document_name, 
+            owner_id=current_user.id
+        )
+        session.add(project)
+    else:
+        project.owner_id = current_user.id
+        project.name = request.document_name
+        session.add(project)
+    session.commit()
+    
     return result
 
 
@@ -58,7 +80,11 @@ def run(request: RunDiligenceRequest) -> DiligenceResult:
 # ─────────────────────────────────────────────
 
 @router.get("/{doc_id}", response_model=DiligenceResult)
-def get_result(result: DiligenceResult = Depends(get_cached_result)) -> DiligenceResult:
+def get_result(
+    result: DiligenceResult = Depends(get_cached_result),
+    current_user: User = Depends(get_current_user),
+    _access = Depends(verify_project_access)
+) -> DiligenceResult:
     """
     Fetch a previously cached diligence result by doc_id (SHA-256 of document text).
     Use this to reload results without re-running the pipeline.

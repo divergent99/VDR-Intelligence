@@ -13,7 +13,12 @@ import base64
 import json
 import math
 
-from dash import Input, Output, State, no_update, html, dcc
+import logging
+logger = logging.getLogger(__name__)
+
+import os
+import hashlib
+from dash import Input, Output, State, no_update, html, dcc, ctx
 import dash_daq as daq
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
@@ -129,6 +134,84 @@ def register(app):
             return no_update, no_update
         return {"display": "block", "paddingTop": "80px"}, {"display": "none"}
 
+    # ── Update URL on new pipeline run ───────────────────────────
+    @app.callback(
+        Output("url", "search"),
+        Input("results-store", "data"),
+        prevent_initial_call=True
+    )
+    def update_url(data):
+        if not data or "doc_id" not in data:
+            return no_update
+        return f"?doc_id={data['doc_id']}"
+
+
+    # ── Load pipeline on start from URL ──────────────────────────
+    @app.callback(
+        Output("results-store", "data", allow_duplicate=True),
+        Output("pipeline-progress", "children", allow_duplicate=True),
+        Input("url", "search"),
+        Input("auth-token", "data"),
+        prevent_initial_call=True
+    )
+    def load_from_url(search, token):
+        if not token:
+            return no_update, no_update
+        if not search or "doc_id=" not in search:
+            return no_update, no_update
+        
+        try:
+            # Parse ?doc_id=XYZ
+            params = dict(p.split("=") for p in search.strip("?").split("&") if "=" in p)
+            doc_id = params.get("doc_id")
+            
+            if not doc_id:
+                return no_update, no_update
+
+            from frontend.api_client import get_diligence
+            result = get_diligence(doc_id, token)
+            result["doc_id"] = doc_id
+            
+            return result, html.Div("✓ Loaded shared project",
+                style={"fontFamily": MONO, "fontSize": "11px", "color": C["low"]})
+        except:
+            return no_update, no_update
+
+
+    # ── Project Result Sync Poller ──────────────────────────────
+    @app.callback(
+        Output("results-store", "data", allow_duplicate=True),
+        Input("sync-interval", "n_intervals"),
+        State("auth-token", "data"),
+        State("url", "search"),
+        State("results-store", "data"),
+        prevent_initial_call=True
+    )
+    def sync_project(n, token, search, current_data):
+        if not token or not search or "doc_id=" not in search:
+            return no_update
+        
+        try:
+            params = dict(p.split("=") for p in search.strip("?").split("&") if "=" in p)
+            doc_id = params.get("doc_id")
+            if not doc_id:
+                return no_update
+
+            # Only sync if results-store is empty OR we want to poll for completion
+            # In a real app, we might check a 'status' field.
+            # Here, if current_data is None or missing synthesis_report, we poll.
+            if current_data and current_data.get("synthesis_report"):
+                return no_update
+
+            from frontend.api_client import get_diligence
+            result = get_diligence(doc_id, token)
+            result["doc_id"] = doc_id
+            return result
+        except Exception as e:
+            logger.error(f"Sync project error: {e}")
+            return no_update
+
+
     # ── Run pipeline → store results ─────────────────────────────
     @app.callback(
         Output("results-store", "data"),
@@ -137,24 +220,26 @@ def register(app):
         State("upload-docs", "contents"),
         State("upload-docs", "filename"),
         State("folder-path", "value"),
+        State("auth-token", "data"),
         prevent_initial_call=True,
     )
-    def run_pipeline(n, contents, filenames, folder_path):
+    def run_pipeline(n, contents, filenames, folder_path, token):
         if not n:
             return no_update, no_update
         try:
-            if folder_path and __import__("os").path.isdir(folder_path):
-                result = extract_from_folder(folder_path)
+            if folder_path and os.path.isdir(folder_path):
+                result = extract_from_folder(folder_path, token)
                 if result and "doc_id" not in result:
-                    result["doc_id"] = result.get("doc_id") or __import__("hashlib").sha256(folder_path.encode()).hexdigest()[:16]
+                    # Fallback doc_id generation
+                    result["doc_id"] = result.get("doc_id") or hashlib.sha256(folder_path.encode()).hexdigest()[:16]
 
             elif contents and filenames:
                 file_tuples = [
                     (filename, base64.b64decode(content.split(",", 1)[1]))
                     for content, filename in zip(contents, filenames)
                 ]
-                upload_resp = upload_files(file_tuples)
-                result = run_diligence(upload_resp["extracted_text"], "uploaded_vdr")
+                upload_resp = upload_files(file_tuples, token)
+                result = run_diligence(upload_resp["extracted_text"], "uploaded_vdr", token)
                 result["doc_id"] = upload_resp["doc_id"]
 
             else:
@@ -181,20 +266,27 @@ def register(app):
     def render(data, theme):
         set_theme(theme or "dark")
         hidden = {"display": "none"}
-        if not data:
+        if not data or not isinstance(data, dict):
             return html.Div(), hidden, {"paddingTop": "130px"}, hidden
 
-        syn  = data.get("synthesis_report")  or {}
-        fin  = data.get("financial_analysis") or {}
-        con  = data.get("contract_red_flags") or {}
-        comp = data.get("compliance_issues")  or {}
-        rm   = syn.get("risk_matrix", {})
+        def _get_dict(obj):
+            return obj if isinstance(obj, dict) else {}
 
+        syn  = _get_dict(data.get("synthesis_report"))
+        fin  = _get_dict(data.get("financial_analysis"))
+        con  = _get_dict(data.get("contract_red_flags"))
+        comp = _get_dict(data.get("compliance_issues"))
+        
+        score_breakdown = _get_dict(syn.get("score_breakdown"))
+        if not score_breakdown:
+            score_breakdown = {"financial": 50, "legal": 50, "compliance": 50, "overall": 50}
+            
+        rm = _get_dict(syn.get("risk_matrix"))
+        
         deal_score      = syn.get("deal_score", 50)
-        score_breakdown = syn.get("score_breakdown", {"financial": 50, "legal": 50, "compliance": 50, "overall": 50})
-        diligence_cov   = syn.get("diligence_coverage", {})
+        diligence_cov   = _get_dict(syn.get("diligence_coverage"))
         deal_risks      = syn.get("deal_risks_summary", [])
-        fin_scores      = fin.get("scores", {})
+        fin_scores      = _get_dict(fin.get("scores"))
 
         n_flags     = len(con.get("red_flags", []))
         n_blocking  = len(comp.get("blocking_issues", []))
@@ -310,8 +402,8 @@ def _deal_score_narrative(score: int, breakdown: dict, recommendation: str) -> s
     cmp = breakdown.get("compliance", 50)
 
     areas = {"Financial": fin, "Legal": leg, "Compliance": cmp}
-    weakest = min(areas, key=areas.get)
-    weakest_score = areas[weakest]
+    weakest = min(areas.keys(), key=lambda k: areas.get(k, 50) or 50)
+    weakest_score = areas.get(weakest, 50) or 50
 
     if score >= 75:
         opener = f"This deal scores **{score}/100** — a strong result indicating well-managed risks across all diligence dimensions."

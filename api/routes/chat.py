@@ -9,10 +9,12 @@ from __future__ import annotations
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlmodel import Session, select
 
 from models.schemas import ChatRequest, ChatResponse, DiligenceResult
-from api.dependencies import get_cached_result, get_bedrock_client
+from models.db import ChatMessage, User
+from api.dependencies import get_cached_result, get_bedrock_client, get_session, get_current_user, verify_project_access
 from pipeline.nova import invoke_nova, NovaInvokeError
 from config import settings
 
@@ -95,21 +97,29 @@ def chat(
     request: ChatRequest,
     result: DiligenceResult = Depends(get_cached_result),
     client=Depends(get_bedrock_client),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _access = Depends(verify_project_access)
 ) -> ChatResponse:
     """
     Ask Nova anything about a specific diligence result.
     Answers are grounded solely in the cached report — no hallucination.
-
-    - Pass the doc_id returned by POST /upload or POST /diligence/run
-    - Include conversation history for multi-turn context
+    Saves history to database for real-time collaboration.
     """
+    # 1. Build context & prompt
     context = _build_context(result)
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(context=context)
     messages = _build_messages(request)
 
-    logger.info("POST /diligence/%s…/chat — message='%.80s'", doc_id[:12], request.message)
+    logger.info("POST /diligence/%s…/chat — user=%s", doc_id[:12], current_user.email)
+
+    # 2. Save User Message
+    user_msg = ChatMessage(doc_id=doc_id, role="user", content=request.message)
+    session.add(user_msg)
+    session.commit()
 
     try:
+        # 3. Invoke Bedrock
         response = client.converse(
             modelId=settings.nova_model_id,
             system=[{"text": system_prompt}],
@@ -117,6 +127,12 @@ def chat(
             inferenceConfig={"maxTokens": 2048, "temperature": 0.2},
         )
         reply = response["output"]["message"]["content"][0]["text"]
+        
+        # 4. Save Nova Reply
+        bot_msg = ChatMessage(doc_id=doc_id, role="assistant", content=reply)
+        session.add(bot_msg)
+        session.commit()
+        
         logger.info("Chat reply received (%d chars)", len(reply))
 
     except NovaInvokeError as exc:
@@ -127,3 +143,26 @@ def chat(
         raise HTTPException(status_code=500, detail=str(exc))
 
     return ChatResponse(reply=reply, doc_id=doc_id, job_id=doc_id)
+
+
+# ─────────────────────────────────────────────
+# GET /diligence/{doc_id}/chat
+# ─────────────────────────────────────────────
+
+@router.get("/{doc_id}/chat", response_model=list[ChatMessage])
+def get_chat_history(
+    doc_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _access = Depends(verify_project_access)
+) -> list[ChatMessage]:
+    """
+    Retrieve the full chat history for a document. 
+    Used for real-time syncing between collaborators.
+    """
+    messages = session.exec(
+        select(ChatMessage)
+        .where(ChatMessage.doc_id == doc_id)
+        .order_by(ChatMessage.timestamp)
+    ).all()
+    return messages

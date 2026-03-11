@@ -185,7 +185,7 @@ Open **http://localhost:8050** · API docs at **http://localhost:8000/docs**
 
 ## Team
 
-[divergent99](https://github.com/divergent99) · [YanaaGupta](https://github.com/YanaaGupta) · [Jagrit787](https://github.com/Jagrit787) · [Mango-IM25](https://github.com/Mango-IM25)
+[divergent99](https://github.com/divergent99) · [YanaaGupta](https://github.com/YanaaGupta) · [Jagrit787](https://github.com/Jagrit787) · [Ishan-2504](https://github.com/Ishan-2504)
 
 </div>
 

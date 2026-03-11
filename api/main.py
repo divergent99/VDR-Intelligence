@@ -17,6 +17,10 @@ from config import settings
 from api.routes.upload import router as upload_router
 from api.routes.diligence import router as diligence_router
 from api.routes.chat import router as chat_router
+from api.routes.auth import router as auth_router
+from api.routes.projects import router as projects_router
+from models.db import SQLModel
+from api.dependencies import engine
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,6 +58,10 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Bedrock client could not be initialised: %s", exc)
         logger.warning("Check AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in your .env")
+
+    # Create Database Tables
+    logger.info("Creating SQLite database tables...")
+    SQLModel.metadata.create_all(engine)
 
     logger.info("VDR Intelligence API ready on port %s", settings.api_port)
 
@@ -96,6 +104,8 @@ app.add_middleware(
 app.include_router(upload_router,    prefix=settings.api_prefix)
 app.include_router(diligence_router, prefix=settings.api_prefix)
 app.include_router(chat_router,      prefix=settings.api_prefix)
+app.include_router(auth_router,      prefix=settings.api_prefix)
+app.include_router(projects_router,  prefix=settings.api_prefix)
 
 
 # ─────────────────────────────────────────────

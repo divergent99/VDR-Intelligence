@@ -11,7 +11,7 @@ import dash
 import dash_bootstrap_components as dbc
 
 from frontend.layout import build_layout
-from frontend.callbacks import pipeline, chat, toggle
+from frontend.callbacks import pipeline, chat, toggle, auth
 
 app = dash.Dash(
     __name__,
@@ -83,6 +83,7 @@ app.layout = build_layout("dark")
 # Register all callbacks
 pipeline.register(app)
 chat.register(app)
+auth.register_auth(app)
 toggle.register(app)
 
 if __name__ == "__main__":

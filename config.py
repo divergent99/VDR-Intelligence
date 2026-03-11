@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     chroma_collection: str  = "diligence_results"
     cache_enabled:     bool = True
 
+    # ── Database & Auth ──────────────────────────────────────────
+    db_url: str = "sqlite:///./vdr_intelligence.db"
+    secret_key: str = "super_secret_key_for_jwt_please_change_in_production"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 1440 # 24 hours
+
     # ── API ──────────────────────────────────────────────────────
     api_host:     str = "0.0.0.0"
     api_port:     int = 8000

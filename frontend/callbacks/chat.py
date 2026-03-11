@@ -7,11 +7,10 @@ Chat callbacks — two-stage pattern:
 
 from __future__ import annotations
 
-from dash import Input, Output, State, no_update, html, dcc, ctx
+from dash import Input, Output, State, no_update, html, dcc, ctx, ALL
 from dash.exceptions import PreventUpdate
 
 from frontend.theme import C, MONO, DM, set_theme
-from frontend.api_client import chat as nova_chat
 
 QUICK_QUESTIONS = [
     "What is the biggest risk in this deal?",
@@ -70,8 +69,15 @@ def _typing_indicator() -> html.Div:
 def _build_bubbles(history: list[dict]) -> list:
     bubbles = []
     for turn in history:
-        bubbles.append(_bubble_user(turn["user"]))
-        bubbles.append(_bubble_nova(turn["bot"]))
+        # Turn can be {'user': '...', 'bot': '...'} (old format) or ChatMessage dict (role, content)
+        if "role" in turn:
+            if turn["role"] == "user":
+                bubbles.append(_bubble_user(turn["content"]))
+            else:
+                bubbles.append(_bubble_nova(turn["content"]))
+        else:
+            bubbles.append(_bubble_user(turn.get("user", "")))
+            bubbles.append(_bubble_nova(turn.get("bot", "")))
     return bubbles
 
 
@@ -80,7 +86,7 @@ def register(app):
     # ── Quick question → fill input ──────────────────────────────
     @app.callback(
         Output("chat-input", "value", allow_duplicate=True),
-        Input({"type": "quick-q", "index": __import__("dash").ALL}, "n_clicks"),
+        Input({"type": "quick-q", "index": ALL}, "n_clicks"),
         prevent_initial_call=True,
     )
     def quick_question(n_clicks):
@@ -90,6 +96,31 @@ def register(app):
         if triggered is None:
             return no_update
         return QUICK_QUESTIONS[triggered["index"]]
+
+    # ── Chat Sync Poller ─────────────────────────────────────────
+    @app.callback(
+        Output("chat-history", "data"),
+        Input("sync-interval", "n_intervals"),
+        State("auth-token", "data"),
+        State("results-store", "data"),
+        State("chat-history", "data"),
+        prevent_initial_call=False,
+    )
+    def sync_chat(n, token, pipeline_data, current_history):
+        if not token or not pipeline_data or "doc_id" not in pipeline_data:
+            return no_update
+        
+        doc_id = pipeline_data["doc_id"]
+        try:
+            from frontend.api_client import get_chat_history
+            new_history = get_chat_history(token, doc_id)
+            
+            # Simple check to avoid circular updates/no-ops
+            if len(new_history) != len(current_history):
+                return new_history
+        except:
+            pass
+        return no_update
 
     # ── Stage 1: show message + typing indicator instantly ───────
     @app.callback(
@@ -112,6 +143,61 @@ def register(app):
         bubbles.append(_typing_indicator())
         return bubbles, msg.strip(), ""
 
+    # ── Stage 2: call FastAPI, then clear pending ────────────────
+    @app.callback(
+        Output("chat-pending", "data", allow_duplicate=True),
+        Input("chat-pending", "data"),
+        State("chat-history", "data"),
+        State("results-store", "data"),
+        State("auth-token", "data"),
+        prevent_initial_call=True,
+    )
+    def chat_stage2(msg, history, pipeline_data, token):
+        if not msg or not pipeline_data or not token:
+            return no_update
+
+        try:
+            doc_id  = pipeline_data.get("doc_id") or ""
+            if doc_id:
+                history_payload = []
+                for t in history[-6:]:
+                    if "role" in t:
+                        history_payload.append({"role": t["role"], "content": t["content"]})
+                    else:
+                        history_payload.append({"role": "user", "content": t.get("user", "")})
+                        history_payload.append({"role": "assistant", "content": t.get("bot", "")})
+                
+                # Import here to avoid circular dependencies if any
+                from frontend.api_client import BASE_URL
+                import requests
+                
+                requests.post(
+                    f"{BASE_URL}/diligence/{doc_id}/chat", 
+                    json={"message": msg, "history": history_payload},
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=60
+                )
+        except Exception as e:
+            print(f"Chat error: {e}")
+            
+        return None # Clear pending, poller will pick up the results
+
+    # ── Final Render Callback ────────────────────────────────────
+    @app.callback(
+        Output("chat-messages", "children"),
+        Input("chat-history", "data"),
+        State("chat-pending", "data"),
+        State("theme-store", "data"),
+        prevent_initial_call=False
+    )
+    def render_chat(history, pending, theme):
+        set_theme(theme or "dark")
+        bubbles = _build_bubbles(history)
+        if pending:
+            bubbles.append(_bubble_user(pending))
+            bubbles.append(_typing_indicator())
+        return bubbles
+
     # ── Auto-scroll chat ─────────────────────────────────────────
     app.clientside_callback(
         "function(c){setTimeout(function(){"
@@ -122,41 +208,3 @@ def register(app):
         Input("chat-messages", "children"),
         prevent_initial_call=True,
     )
-
-    # ── Stage 2: call FastAPI, replace typing indicator ──────────
-    @app.callback(
-        Output("chat-messages", "children"),
-        Output("chat-history", "data"),
-        Input("chat-pending", "data"),
-        State("chat-history", "data"),
-        State("results-store", "data"),
-        State("theme-store", "data"),
-        prevent_initial_call=True,
-    )
-    def chat_stage2(msg, history, pipeline_data, theme):
-        set_theme(theme or "dark")
-        if not msg:
-            return no_update, no_update
-
-        if not pipeline_data:
-            bot = "Run the diligence pipeline first, then ask me anything about this deal."
-        else:
-            try:
-                doc_id  = pipeline_data.get("doc_id") or ""
-                if not doc_id:
-                    bot = "No document ID found — please re-run the pipeline before chatting."
-                    new_history = history + [{"user": msg, "bot": bot}]
-                    return _build_bubbles(new_history), new_history
-                history_payload = [
-                    {"role": "user",      "content": t["user"]}
-                    for t in history[-6:]
-                ] + [
-                    {"role": "assistant", "content": t["bot"]}
-                    for t in history[-6:]
-                ]
-                bot = nova_chat(doc_id, msg, history_payload)
-            except Exception as e:
-                bot = f"Error contacting API: {e}"
-
-        new_history = history + [{"user": msg, "bot": bot}]
-        return _build_bubbles(new_history), new_history

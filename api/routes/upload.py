@@ -9,11 +9,14 @@ from __future__ import annotations
 import hashlib
 import logging
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from typing import List
 
 from models.schemas import UploadResponse
 from ingestion.extractor import extract_from_bytes, combine_uploads
+
+from models.db import User
+from api.dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/upload", tags=["upload"])
@@ -22,7 +25,10 @@ SUPPORTED = {".pdf", ".docx", ".xlsx", ".xls"}
 
 
 @router.post("", response_model=UploadResponse)
-async def upload_files(files: List[UploadFile] = File(...)) -> UploadResponse:
+async def upload_files(
+    files: List[UploadFile] = File(...),
+    current_user: User = Depends(get_current_user)
+) -> UploadResponse:
     """
     Accept one or more VDR documents, extract their text, and return
     a combined payload ready to pass directly into POST /diligence/run.

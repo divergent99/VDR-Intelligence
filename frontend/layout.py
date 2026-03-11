@@ -325,6 +325,46 @@ def loading_screen():
 
 
 # ─────────────────────────────────────────────
+# MODALS
+# ─────────────────────────────────────────────
+
+def _login_modal():
+    return dbc.Modal([
+        dbc.ModalHeader(dbc.ModalTitle("VDR Intelligence Login", style={"fontFamily": BEBAS, "color": C["accent"], "letterSpacing": "0.05em"})),
+        dbc.ModalBody([
+            html.Div("Please log in or register to access secure deal rooms.", style={"fontFamily": DM, "fontSize": "12px", "color": C["muted"], "marginBottom": "16px"}),
+            dcc.Input(id="login-email", type="email", placeholder="Email address", style={"width": "100%", "background": C["bg"], "border": f"1px solid {C['border']}", "borderRadius": "8px", "padding": "10px 12px", "color": C["text"], "fontFamily": MONO, "fontSize": "11px", "marginBottom": "10px"}),
+            dcc.Input(id="login-password", type="password", placeholder="Password", style={"width": "100%", "background": C["bg"], "border": f"1px solid {C['border']}", "borderRadius": "8px", "padding": "10px 12px", "color": C["text"], "fontFamily": MONO, "fontSize": "11px", "marginBottom": "16px"}),
+            html.Div(id="login-error", style={"color": C["stop"], "fontFamily": MONO, "fontSize": "10px", "marginBottom": "10px"}),
+            html.Div([
+                html.Button("Login", id="login-btn", n_clicks=0, style={"flex": "1", "background": f"linear-gradient(135deg,{C['accent']},{C['cyan']})", "border": "none", "borderRadius": "8px", "padding": "10px", "color": "#07070f", "fontFamily": BEBAS, "fontSize": "16px", "cursor": "pointer", "marginRight": "8px"}),
+                html.Button("Register", id="register-btn", n_clicks=0, style={"flex": "1", "background": C["surf2"], "border": f"1px solid {C['border']}", "borderRadius": "8px", "padding": "10px", "color": C["text"], "fontFamily": BEBAS, "fontSize": "16px", "cursor": "pointer"}),
+            ], style={"display": "flex", "width": "100%"}),
+        ]),
+    ], id="login-modal", is_open=True, backdrop="static", keyboard=False, style={"backgroundColor": "rgba(7,7,15,0.8)"})
+
+
+def _share_modal():
+    return dbc.Modal([
+        dbc.ModalHeader(dbc.ModalTitle("Share Project", style={"fontFamily": BEBAS, "color": C["accent"], "letterSpacing": "0.05em"})),
+        dbc.ModalBody([
+            html.Div("Invite collaborators by email address.", style={"fontFamily": DM, "fontSize": "12px", "color": C["muted"], "marginBottom": "16px"}),
+            html.Div([
+                dcc.Input(id="share-email", type="email", placeholder="collaborator@example.com", style={"flex": "1", "background": C["bg"], "border": f"1px solid {C['border']}", "borderRadius": "8px", "padding": "10px 12px", "color": C["text"], "fontFamily": MONO, "fontSize": "11px", "marginRight": "8px"}),
+                html.Button("Invite", id="do-share-btn", n_clicks=0, style={"background": C["accent"], "border": "none", "borderRadius": "8px", "padding": "10px 16px", "color": "white", "fontFamily": BEBAS, "fontSize": "16px", "cursor": "pointer"}),
+            ], style={"display": "flex", "marginBottom": "12px"}),
+            html.Div(id="share-status", style={"fontFamily": MONO, "fontSize": "10px", "color": C["cyan"], "marginBottom": "16px"}),
+            
+            html.Div("Or share via secure link:", style={"fontFamily": DM, "fontSize": "12px", "color": C["muted"], "marginBottom": "8px", "borderTop": f"1px solid {C['border']}", "paddingTop": "16px"}),
+            html.Div([
+                dcc.Input(id="share-link-read", type="text", readOnly=True, style={"flex": "1", "background": C["surf2"], "border": f"1px solid {C['border']}", "borderRadius": "8px", "padding": "10px 12px", "color": C["muted"], "fontFamily": MONO, "fontSize": "10px", "marginRight": "8px"}),
+                dcc.Clipboard(id="share-link-clipboard", target_id="share-link-read", style={"display": "inline-block", "fontSize": "20px", "color": C["accent"], "cursor": "pointer", "padding": "6px"}),
+            ], style={"display": "flex"})
+        ]),
+    ], id="share-modal", is_open=False)
+
+
+# ─────────────────────────────────────────────
 # FULL LAYOUT
 # ─────────────────────────────────────────────
 
@@ -337,39 +377,65 @@ def build_layout(theme: str = "dark"):
         "borderRadius": "6px", "padding": "4px 10px",
         "color": C["accent"], "fontFamily": MONO,
         "fontSize": "9px", "letterSpacing": "0.14em", "cursor": "pointer",
+        "marginLeft": "8px"
     }
 
+    def _projects_modal():
+        return dbc.Modal([
+            dbc.ModalHeader(dbc.ModalTitle("MY PROJECTS", style={"fontFamily": BEBAS, "letterSpacing": "0.1em"})),
+            dbc.ModalBody([
+                html.Div("Select a project to load its diligence results.", 
+                         style={"fontFamily": DM, "fontSize": "12px", "color": C["muted"], "marginBottom": "15px"}),
+                html.Div(id="projects-list-container", style={"maxHeight": "400px", "overflowY": "auto"})
+            ]),
+            dbc.ModalFooter(dbc.Button("Close", id="close-projects-btn", className="ms-auto", color="secondary"))
+        ], id="projects-modal", size="lg", is_open=False)
+
     return html.Div([
+        dcc.Location(id="url", refresh=False),
         dcc.Store(id="results-store"),
         dcc.Store(id="chat-history", data=[]),
         dcc.Store(id="chat-pending", data=None),
         dcc.Store(id="theme-store", data=theme),
+        dcc.Store(id="auth-token", storage_type="local"),
+        dcc.Store(id="user-email", storage_type="local"),
+        dcc.Store(id="my-projects-store", data=[]),
+        dcc.Interval(id="sync-interval", interval=5000, n_intervals=0),
+
+        _login_modal(),
+        _share_modal(),
+        _projects_modal(),
 
         # HEADER
-        html.Div([html.Div([
+        html.Div([
             html.Div([
-                html.Span("DEAL", style={"fontFamily": BEBAS, "fontSize": "24px",
-                    "color": C["accent"], "letterSpacing": "0.06em"}),
-                html.Span("LENS", style={"fontFamily": BEBAS, "fontSize": "24px",
-                    "color": C["cyan"], "letterSpacing": "0.06em"}),
+                html.Div([
+                    html.Span("DEAL", style={"fontFamily": BEBAS, "fontSize": "24px", "color": C["accent"], "letterSpacing": "0.06em"}),
+                    html.Span("LENS", style={"fontFamily": BEBAS, "fontSize": "24px", "color": C["cyan"], "letterSpacing": "0.06em"}),
+                ], style={"display": "flex", "alignItems": "center"}),
                 html.Div("M&A DUE DILIGENCE ORCHESTRATOR · AMAZON NOVA 2",
-                    style={"fontFamily": MONO, "fontSize": "8px",
-                           "letterSpacing": "0.22em", "color": C["muted"]}),
-            ]),
+                         style={"fontFamily": MONO, "fontSize": "8px", "letterSpacing": "0.22em", "color": C["muted"], "marginLeft": "15px"}),
+            ], style={"display": "flex", "alignItems": "center"}),
+
             html.Div([
-                html.Span("Amazon Hackathon 2026", style={"fontFamily": MONO,
-                    "fontSize": "10px", "color": C["muted"]}),
-                html.Span(" · ", style={"color": C["border"], "margin": "0 6px"}),
-                html.Span("Nova 2 Extended Thinking", style={"fontFamily": MONO,
-                    "fontSize": "10px", "color": C["cyan"]}),
-                html.Span(" · ", style={"color": C["border"], "margin": "0 6px"}),
-                html.Button(btn_label, id="theme-toggle", n_clicks=0, style=btn_style),
-            ]),
-        ], style={"display": "flex", "justifyContent": "space-between",
-                  "alignItems": "center", "maxWidth": "1700px",
-                  "margin": "0 auto", "padding": "0 24px"})],
-        style={"background": C["surf"], "borderBottom": f"1px solid {C['border']}",
-               "padding": "13px 0", "position": "sticky", "top": "0", "zIndex": "100"}),
+                html.Span(id="user-display", style={"fontFamily": MONO, "fontSize": "10px", "color": C["cyan"], "marginRight": "15px"}),
+                html.Button("MY PROJECTS", id="open-projects-btn", className="action-btn-small", 
+                            style={"marginRight": "8px", "borderRadius": "4px", "padding": "4px 10px", "fontSize": "10px", 
+                                   "background": "transparent", "border": f"1px solid {C['border']}", "color": C["text"]}),
+                html.Button("SHARE", id="open-share-btn", className="action-btn-small", 
+                            style={"marginRight": "8px", "borderRadius": "4px", "padding": "4px 10px", "fontSize": "10px", 
+                                   "background": C["accent"], "border": "none", "color": "white"}),
+                html.Button("LOGOUT", id="logout-btn", n_clicks=0, style={
+                    "background": "transparent", "border": "none", "color": C["stop"],
+                    "fontFamily": MONO, "fontSize": "9px", "cursor": "pointer", "marginLeft": "12px",
+                    "textDecoration": "underline"
+                }),
+            ], style={"display": "flex", "alignItems": "center"}),
+        ], style={
+            "background": C["surf"], "borderBottom": f"1px solid {C['border']}",
+            "padding": "13px 24px", "position": "sticky", "top": "0", "zIndex": "100",
+            "display": "flex", "justifyContent": "space-between", "alignItems": "center"
+        }),
 
         # BODY
         html.Div([

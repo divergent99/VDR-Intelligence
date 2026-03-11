@@ -34,3 +34,9 @@ plotly>=5.22.0
 
 # Utilities
 requests>=2.32.0
+
+# Database & Auth (Newly added)
+sqlmodel>=0.0.19
+passlib[bcrypt]>=1.7.4
+pyjwt>=2.8.0
+bcrypt>=4.1.0
