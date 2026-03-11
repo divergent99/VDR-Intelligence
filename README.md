@@ -1,5 +1,5 @@
 <div align="center">
-
+         
 ![Banner](assets/AWS%20Hackathon.jpg)
 
 # NovaDD | VDR Intelligence
